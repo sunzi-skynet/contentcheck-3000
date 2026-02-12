@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface VisualPreviewProps {
   label: string;
   annotatedHtml: string;
   url: string;
   defaultHighlightMode?: 'migrated' | 'not-migrated';
+  onIframeRef?: (iframe: HTMLIFrameElement | null) => void;
 }
 
 export default function VisualPreview({
@@ -14,9 +15,16 @@ export default function VisualPreview({
   annotatedHtml,
   url,
   defaultHighlightMode = 'migrated',
+  onIframeRef,
 }: VisualPreviewProps) {
   const [highlightMode, setHighlightMode] = useState<'migrated' | 'not-migrated'>(defaultHighlightMode);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Expose iframe ref to parent via callback
+  useEffect(() => {
+    onIframeRef?.(iframeRef.current);
+    return () => onIframeRef?.(null);
+  }, [onIframeRef]);
 
   const sendToggle = useCallback((mode: 'migrated' | 'not-migrated') => {
     if (iframeRef.current?.contentWindow) {
@@ -41,13 +49,13 @@ export default function VisualPreview({
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">{label}</span>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="text-sm font-semibold text-gray-900 shrink-0">{label}</span>
             <a
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:underline truncate max-w-xs"
+              className="text-xs text-blue-600 hover:underline truncate"
             >
               {url}
             </a>
@@ -84,7 +92,7 @@ export default function VisualPreview({
         <iframe
           ref={iframeRef}
           srcDoc={annotatedHtml}
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-same-origin"
           onLoad={handleIframeLoad}
           className="w-full h-full border-0 rounded-b-lg"
           title={`${label} preview`}

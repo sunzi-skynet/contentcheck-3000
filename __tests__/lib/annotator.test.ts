@@ -70,12 +70,12 @@ describe('annotateContent', () => {
 
       const result = annotateContent(html, html, changes, [], '', '');
 
-      // Should preserve structural elements
-      expect(result.sourceHtml).toContain('<h1>');
+      // Should preserve structural elements (block elements get data-block-idx)
+      expect(result.sourceHtml).toMatch(/<h1[^>]*>/);
       expect(result.sourceHtml).toContain('</h1>');
       expect(result.sourceHtml).toContain('<strong>');
       expect(result.sourceHtml).toContain('</strong>');
-      expect(result.sourceHtml).toContain('<p>');
+      expect(result.sourceHtml).toMatch(/<p[^>]*>/);
     });
 
     it('handles empty content gracefully', () => {
@@ -219,10 +219,12 @@ describe('annotateContent', () => {
       expect(result.sourceHtml).toContain('toggle-highlight');
     });
 
-    it('defaults to show-migrated body class', () => {
+    it('sets default highlight body class based on side', () => {
       const result = annotateContent('<p>Test</p>', '<p>Test</p>', [], [], '', '');
 
-      expect(result.sourceHtml).toContain('class="show-migrated"');
+      // Source defaults to not-migrated (red), target defaults to migrated (green)
+      expect(result.sourceHtml).toContain('<body class="show-not-migrated">');
+      expect(result.targetHtml).toContain('<body class="show-migrated">');
     });
   });
 
@@ -240,8 +242,8 @@ describe('annotateContent', () => {
       const result = annotateContent(sourceHtml, targetHtml, changes, [], sourceText, targetText);
 
       // "Author Name" is removed in the diff but exists in target text,
-      // so it should be marked as migrated (moved) rather than not-migrated
-      expect(result.sourceHtml).toContain('<mark class="migrated">Author Name</mark>');
+      // so it should be marked as migrated+moved rather than not-migrated
+      expect(result.sourceHtml).toContain('<mark class="migrated moved">Author Name</mark>');
       // Only text highlights — no not-migrated marks expected
       expect(result.sourceHtml).not.toMatch(/<mark class="not-migrated">/);
 
@@ -260,8 +262,8 @@ describe('annotateContent', () => {
       const result = annotateContent(sourceHtml, targetHtml, changes, [], sourceText, targetText);
 
       // "Author Name" is added in the diff but exists in source text,
-      // so it should be marked as migrated in the target view
-      expect(result.targetHtml).toContain('<mark class="migrated">Author Name</mark>');
+      // so it should be marked as migrated+moved in the target view
+      expect(result.targetHtml).toContain('<mark class="migrated moved">Author Name</mark>');
     });
 
     it('does not mark short single words as moved', () => {
@@ -296,7 +298,7 @@ describe('annotateContent', () => {
       // "Category Info" is genuinely removed — not in target
       // "Author Name" is moved — exists in target
       expect(result.sourceHtml).toContain('<mark class="not-migrated">Category Info</mark>');
-      expect(result.sourceHtml).toContain('<mark class="migrated">Author Name</mark>');
+      expect(result.sourceHtml).toContain('<mark class="migrated moved">Author Name</mark>');
     });
   });
 

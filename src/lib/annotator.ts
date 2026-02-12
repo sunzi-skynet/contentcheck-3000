@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type { DiffChange, ImageDetail, AnnotatedContent } from './types';
 
-type HighlightClass = 'migrated' | 'not-migrated';
+type HighlightClass = 'migrated' | 'not-migrated' | 'migrated-moved';
 
 interface TaggedChar {
   char: string;
@@ -38,6 +38,11 @@ function annotateView(
 ): string {
   const $ = cheerio.load(contentHtml, null, false);
 
+  // Defense-in-depth: strip any remaining script/style tags from content.
+  // The extractor already strips these, but since we use allow-same-origin
+  // on the iframe sandbox, ensure no foreign scripts can execute.
+  $('script').remove();
+
   // Build character-level annotation data from diff changes
   const taggedChars = buildTaggedChars(diffChanges, side, otherSideText);
 
@@ -47,7 +52,12 @@ function annotateView(
   // Annotate images
   annotateImages($, imageDetails, side);
 
-  return wrapInHtmlDocument($.html());
+  // Tag block elements with indices and insert alignment spacers
+  tagBlockElements($);
+
+  // Source defaults to showing not-migrated (red), target to migrated (green)
+  const defaultMode = side === 'source' ? 'not-migrated' : 'migrated';
+  return wrapInHtmlDocument($.html(), defaultMode);
 }
 
 /**
@@ -143,7 +153,7 @@ function pushCharsWithMovedCheck(
 
   for (const segment of segments) {
     const trimmed = segment.trim();
-    const cssClass = isMovedContent(trimmed, otherSideNormalized) ? 'migrated' : defaultClass;
+    const cssClass = isMovedContent(trimmed, otherSideNormalized) ? 'migrated-moved' : defaultClass;
     pushChars(result, segment, cssClass);
   }
 }
@@ -222,6 +232,11 @@ function annotateTextNodes(
  */
 function formatRun(text: string, cssClass: HighlightClass | null): string {
   const escaped = escapeHtml(text);
+  if (cssClass === 'migrated-moved') {
+    // Visually same as migrated (CSS mark.migrated applies), but 'moved' class
+    // lets the alignment script exclude it from isShared detection
+    return `<mark class="migrated moved">${escaped}</mark>`;
+  }
   if (cssClass) {
     return `<mark class="${cssClass}">${escaped}</mark>`;
   }
@@ -326,6 +341,68 @@ function matchedTargetUrlByFilename(src: string, matchedUrls: Set<string>): bool
   return false;
 }
 
+/**
+ * Content block tags that typically contain text directly.
+ * These are "leaf" blocks used for alignment anchoring.
+ */
+const LEAF_BLOCK_TAGS = new Set([
+  'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'li', 'dt', 'dd', 'figcaption', 'pre', 'summary', 'th', 'td',
+]);
+
+/** Standalone visual elements that serve as alignment blocks. */
+const STANDALONE_BLOCK_TAGS = new Set(['img', 'hr']);
+
+/**
+ * Walk the DOM and tag content blocks with sequential `data-block-idx` attributes.
+ * Insert a zero-height `<div class="sync-spacer">` before each block for alignment.
+ *
+ * Only "leaf" block elements (those that don't contain other block elements) are tagged,
+ * plus standalone visual elements like <img> and <hr>.
+ */
+function tagBlockElements($: cheerio.CheerioAPI): void {
+  // Phase 1: collect block elements in document order
+  const blocks: AnyNode[] = [];
+
+  function walk(node: AnyNode): void {
+    if (node.type !== 'tag') return;
+    const tag = (node as unknown as { tagName: string }).tagName?.toLowerCase();
+
+    if (tag && LEAF_BLOCK_TAGS.has(tag)) {
+      if ($(node).text().trim()) {
+        blocks.push(node);
+      }
+      return; // Don't recurse into leaf blocks
+    }
+
+    if (tag && STANDALONE_BLOCK_TAGS.has(tag)) {
+      blocks.push(node);
+      return;
+    }
+
+    // Recurse into non-block containers
+    if ('children' in node && node.children) {
+      for (const child of node.children) {
+        walk(child as AnyNode);
+      }
+    }
+  }
+
+  const root = $.root()[0];
+  if (root && 'children' in root && root.children) {
+    for (const child of root.children) {
+      walk(child as AnyNode);
+    }
+  }
+
+  // Phase 2: tag collected blocks and insert spacers
+  for (let i = 0; i < blocks.length; i++) {
+    const $el = $(blocks[i]);
+    $el.attr('data-block-idx', String(i));
+    $el.before(`<div class="sync-spacer" data-spacer="${i}" style="height:0px"></div>`);
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -336,10 +413,10 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Wrap annotated content in a full HTML document with highlight styles
- * and a toggle script that listens for postMessage from the parent.
+ * Wrap annotated content in a full HTML document with highlight styles,
+ * sync-scroll support, and a message handler for parent communication.
  */
-function wrapInHtmlDocument(annotatedBody: string): string {
+function wrapInHtmlDocument(annotatedBody: string, defaultMode: 'migrated' | 'not-migrated' = 'migrated'): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -390,16 +467,120 @@ function wrapInHtmlDocument(annotatedBody: string): string {
   body.show-not-migrated img.img-not-migrated {
     border-color: #ef4444;
   }
+
+  /* Alignment spacers for sync scroll */
+  .sync-spacer {
+    height: 0;
+    overflow: hidden;
+    transition: height 0.15s ease;
+  }
 </style>
 </head>
-<body class="show-migrated">
+<body class="show-${defaultMode}">
 ${annotatedBody}
 <script>
-window.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'toggle-highlight') {
-    document.body.className = 'show-' + event.data.mode;
-  }
-});
+(function() {
+  var _syncEnabled = false;
+  var _isProgrammatic = false;
+  var _sideId = null;
+
+  window.addEventListener('message', function(event) {
+    var data = event.data;
+    if (!data || !data.type) return;
+
+    switch (data.type) {
+      case 'toggle-highlight':
+        document.body.className = 'show-' + data.mode;
+        break;
+
+      case 'measure-blocks':
+        var elems = document.querySelectorAll('[data-block-idx]');
+        var measurements = [];
+        var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+        for (var i = 0; i < elems.length; i++) {
+          var block = elems[i];
+          var rect = block.getBoundingClientRect();
+          var migratedChars = 0;
+          var notMigratedChars = 0;
+          var marks = block.querySelectorAll('mark');
+          for (var j = 0; j < marks.length; j++) {
+            var txt = marks[j].textContent || '';
+            // Exclude moved content from shared detection — moved content
+            // is at a different position on each side, so it's not a valid alignment anchor
+            if (marks[j].classList.contains('migrated') && !marks[j].classList.contains('moved')) migratedChars += txt.length;
+            if (marks[j].classList.contains('not-migrated')) notMigratedChars += txt.length;
+          }
+          if (block.tagName === 'IMG') {
+            if (block.classList.contains('img-migrated')) migratedChars = 1;
+            if (block.classList.contains('img-not-migrated')) notMigratedChars = 1;
+          }
+          measurements.push({
+            idx: parseInt(block.getAttribute('data-block-idx'), 10),
+            top: rect.top + scrollTop,
+            height: rect.height,
+            isShared: migratedChars >= notMigratedChars && migratedChars > 0,
+            text: (block.textContent || '').trim().slice(0, 200)
+          });
+        }
+        console.log('[sync-debug] ' + _sideId + ' measure-blocks:', measurements.length, 'blocks,', measurements.filter(function(m) { return m.isShared; }).length, 'shared');
+        for (var di = 0; di < measurements.length; di++) {
+          var dm = measurements[di];
+          console.log('[sync-debug]   [' + dm.idx + '] top=' + Math.round(dm.top) + ' h=' + Math.round(dm.height) + ' shared=' + dm.isShared);
+        }
+        parent.postMessage({ type: 'block-measurements', sideId: _sideId, blocks: measurements }, '*');
+        break;
+
+      case 'set-spacers':
+        var spacers = data.spacers;
+        var spacerKeys = Object.keys(spacers);
+        console.log('[sync-debug] ' + _sideId + ' set-spacers: ' + spacerKeys.length + ' spacers', spacers);
+        for (var key in spacers) {
+          var el = document.querySelector('.sync-spacer[data-spacer="' + key + '"]');
+          if (el) {
+            el.style.height = spacers[key] + 'px';
+            console.log('[sync-debug]   spacer[' + key + '] = ' + spacers[key] + 'px (found)');
+          } else {
+            console.warn('[sync-debug]   spacer[' + key + '] = ' + spacers[key] + 'px (NOT FOUND in DOM)');
+          }
+        }
+        break;
+
+      case 'clear-spacers':
+        var allSpacers = document.querySelectorAll('.sync-spacer');
+        for (var k = 0; k < allSpacers.length; k++) {
+          allSpacers[k].style.height = '0px';
+        }
+        break;
+
+      case 'scroll-to':
+        _isProgrammatic = true;
+        window.scrollTo(0, data.scrollTop);
+        break;
+
+      case 'sync-enable':
+        _syncEnabled = true;
+        if (data.sideId) _sideId = data.sideId;
+        break;
+
+      case 'sync-disable':
+        _syncEnabled = false;
+        break;
+    }
+  });
+
+  window.addEventListener('scroll', function() {
+    if (_isProgrammatic) {
+      _isProgrammatic = false;
+      return;
+    }
+    if (!_syncEnabled) return;
+    parent.postMessage({
+      type: 'scroll-update',
+      sideId: _sideId,
+      scrollTop: document.documentElement.scrollTop || document.body.scrollTop
+    }, '*');
+  }, { passive: true });
+})();
 </script>
 </body>
 </html>`;

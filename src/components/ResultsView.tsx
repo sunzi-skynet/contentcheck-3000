@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import type { ComparisonResult } from '@/lib/types';
 import { useHeader } from '@/context/HeaderContext';
-import VisualPreview from './VisualPreview';
+import SyncPreviewContainer from './SyncPreviewContainer';
 import ImageReport from './ImageReport';
 
 interface ResultsViewProps {
@@ -31,23 +31,13 @@ export default function ResultsView({
 
   return (
     <div className="space-y-6">
-      {/* Full-width visual preview */}
-      <div className="w-full px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <VisualPreview
-            label="Source"
-            annotatedHtml={result.annotatedContent.sourceHtml}
-            url={result.source.url}
-            defaultHighlightMode="not-migrated"
-          />
-          <VisualPreview
-            label="Target"
-            annotatedHtml={result.annotatedContent.targetHtml}
-            url={result.target.url}
-            defaultHighlightMode="migrated"
-          />
-        </div>
-      </div>
+      {/* Full-width visual preview with sync scroll */}
+      <SyncPreviewContainer
+        sourceHtml={result.annotatedContent.sourceHtml}
+        targetHtml={result.annotatedContent.targetHtml}
+        sourceUrl={result.source.url}
+        targetUrl={result.target.url}
+      />
 
       {/* Image report in contained width */}
       <div className="max-w-7xl mx-auto px-4">
