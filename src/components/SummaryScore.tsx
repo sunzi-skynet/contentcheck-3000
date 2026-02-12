@@ -3,63 +3,33 @@
 import type { ComparisonResult } from '@/lib/types';
 
 function getScoreColor(score: number): string {
-  if (score >= 90) return 'text-green-600';
-  if (score >= 70) return 'text-yellow-600';
-  return 'text-red-600';
-}
-
-function getScoreBg(score: number): string {
-  if (score >= 90) return 'bg-green-50 border-green-200';
-  if (score >= 70) return 'bg-yellow-50 border-yellow-200';
-  return 'bg-red-50 border-red-200';
-}
-
-function getBarColor(score: number): string {
-  if (score >= 90) return 'bg-green-500';
-  if (score >= 70) return 'bg-yellow-500';
-  return 'bg-red-500';
+  if (score >= 90) return 'bg-green-100 text-green-700 border-green-300';
+  if (score >= 70) return 'bg-yellow-100 text-yellow-700 border-yellow-300';
+  return 'bg-red-100 text-red-700 border-red-300';
 }
 
 export default function SummaryScore({ result }: { result: ComparisonResult }) {
   const { overallScore, textDiff, images } = result;
+  const imageScore = images.total === 0 ? 100 : (images.found / images.total) * 100;
 
   const stats = [
-    {
-      label: 'Overall Score',
-      value: overallScore,
-      detail: 'Weighted average of text + images',
-    },
-    {
-      label: 'Text Similarity',
-      value: textDiff.similarity,
-      detail: `${result.source.textLength} vs ${result.target.textLength} words`,
-    },
-    {
-      label: 'Images Found',
-      value: images.total === 0 ? 100 : (images.found / images.total) * 100,
-      detail: `${images.found} of ${images.total} images`,
-    },
+    { label: 'Overall', value: `${Math.round(overallScore * 10) / 10}%` },
+    { label: 'Text', value: `${Math.round(textDiff.similarity * 10) / 10}%` },
+    { label: 'Images', value: `${images.found}/${images.total}` },
   ];
 
+  const scores = [overallScore, textDiff.similarity, imageScore];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {stats.map((stat) => (
-        <div
+    <div className="flex items-center gap-2">
+      {stats.map((stat, i) => (
+        <span
           key={stat.label}
-          className={`rounded-lg border p-4 ${getScoreBg(stat.value)}`}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${getScoreColor(scores[i])}`}
         >
-          <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-          <p className={`text-3xl font-bold ${getScoreColor(stat.value)}`}>
-            {Math.round(stat.value * 10) / 10}%
-          </p>
-          <div className="mt-2 h-2 rounded-full bg-gray-200">
-            <div
-              className={`h-full rounded-full transition-all ${getBarColor(stat.value)}`}
-              style={{ width: `${Math.min(stat.value, 100)}%` }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-gray-500">{stat.detail}</p>
-        </div>
+          <span className="text-gray-500 font-normal">{stat.label}</span>
+          {stat.value}
+        </span>
       ))}
     </div>
   );

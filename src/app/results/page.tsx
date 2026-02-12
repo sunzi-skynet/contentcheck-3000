@@ -20,20 +20,11 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Comparison Results
-        </h1>
-        <button
-          onClick={() => router.push('/')}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
-        >
-          Compare another
-        </button>
-      </div>
-
-      <ResultsView result={result} />
+    <div className="py-8">
+      <ResultsView
+        result={result}
+        onCompareAnother={() => router.push('/')}
+      />
     </div>
   );
 }

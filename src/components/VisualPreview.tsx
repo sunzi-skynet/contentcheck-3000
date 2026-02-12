@@ -6,14 +6,16 @@ interface VisualPreviewProps {
   label: string;
   annotatedHtml: string;
   url: string;
+  defaultHighlightMode?: 'migrated' | 'not-migrated';
 }
 
 export default function VisualPreview({
   label,
   annotatedHtml,
   url,
+  defaultHighlightMode = 'migrated',
 }: VisualPreviewProps) {
-  const [highlightMode, setHighlightMode] = useState<'migrated' | 'not-migrated'>('migrated');
+  const [highlightMode, setHighlightMode] = useState<'migrated' | 'not-migrated'>(defaultHighlightMode);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const sendToggle = useCallback((mode: 'migrated' | 'not-migrated') => {
