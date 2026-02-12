@@ -40,6 +40,12 @@ export interface ExtractionResult {
   title: string;
   text: string;
   images: ImageInfo[];
+  contentHtml: string;
+}
+
+export interface AnnotatedContent {
+  sourceHtml: string;
+  targetHtml: string;
 }
 
 export interface ComparisonResult {
@@ -48,6 +54,12 @@ export interface ComparisonResult {
   textDiff: TextDiffResult;
   images: ImageReport;
   overallScore: number;
+  annotatedContent: AnnotatedContent;
+}
+
+export interface AuthCredentials {
+  username: string;
+  password: string;
 }
 
 export interface ComparisonRequest {
@@ -55,10 +67,30 @@ export interface ComparisonRequest {
   targetUrl: string;
   sourceSelector?: string | null;
   targetSelector?: string | null;
+  sourceAuth?: AuthCredentials | null;
+  targetAuth?: AuthCredentials | null;
 }
 
 export interface ApiError {
   error: string;
   code: string;
   details?: string;
+}
+
+/** Lean API response for headless/machine consumers */
+export interface HeadlessApiResponse {
+  resultId: string;
+  resultUrl: string;
+  overallScore: number;
+  text: {
+    score: number;
+    missedContent: string[];
+  };
+  images: {
+    score: number;
+    total: number;
+    found: number;
+    missing: number;
+    missedImages: ImageDetail[];
+  };
 }

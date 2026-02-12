@@ -7,10 +7,22 @@ const MAX_SOURCE_IMAGES = 50;
 const IMAGE_FETCH_TIMEOUT_MS = 5_000;
 const IMAGE_MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg|bmp|ico|avif|tiff?)$/i;
+
 function getFilename(url: string): string {
   try {
     const pathname = new URL(url).pathname;
-    return pathname.split('/').pop() || '';
+    const segments = pathname.split('/').filter(Boolean);
+    // CDN URLs often have the real filename mid-path with processing params after
+    // e.g. .../image.jpg/m/filters:quality(80)
+    // Scan segments for one that looks like an image file
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (IMAGE_EXTENSIONS.test(segments[i])) {
+        return segments[i];
+      }
+    }
+    // Fallback: last segment
+    return segments[segments.length - 1] || '';
   } catch {
     return '';
   }

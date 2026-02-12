@@ -1,4 +1,5 @@
 import { validateUrl } from './url-validator';
+import type { AuthCredentials } from './types';
 
 const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5 MB
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -47,7 +48,7 @@ function detectCharsetFromMeta(bytes: Uint8Array): string | null {
  * Fetches HTML from a URL with SSRF protection, size limits, timeout, and encoding detection.
  * Returns the HTML as a UTF-8 string.
  */
-export async function fetchPage(url: string): Promise<string> {
+export async function fetchPage(url: string, auth?: AuthCredentials | null): Promise<string> {
   const timeoutMs = getTimeoutMs();
   let currentUrl = url;
 
@@ -55,12 +56,19 @@ export async function fetchPage(url: string): Promise<string> {
     // Validate URL (SSRF check) on every hop
     currentUrl = await validateUrl(currentUrl);
 
+    const headers: Record<string, string> = {
+      'User-Agent': USER_AGENT,
+      Accept: 'text/html,application/xhtml+xml',
+    };
+
+    if (auth?.username) {
+      const encoded = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+      headers['Authorization'] = `Basic ${encoded}`;
+    }
+
     const response = await fetch(currentUrl, {
       method: 'GET',
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml',
-      },
+      headers,
       redirect: 'manual',
       signal: AbortSignal.timeout(timeoutMs),
     });

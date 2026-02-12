@@ -12,6 +12,10 @@ export default function CompareForm() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sourceSelector, setSourceSelector] = useState('');
   const [targetSelector, setTargetSelector] = useState('');
+  const [sourceUsername, setSourceUsername] = useState('');
+  const [sourcePassword, setSourcePassword] = useState('');
+  const [targetUsername, setTargetUsername] = useState('');
+  const [targetPassword, setTargetPassword] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,6 +32,8 @@ export default function CompareForm() {
           targetUrl,
           sourceSelector: sourceSelector || null,
           targetSelector: targetSelector || null,
+          sourceAuth: sourceUsername ? { username: sourceUsername, password: sourcePassword } : null,
+          targetAuth: targetUsername ? { username: targetUsername, password: targetPassword } : null,
         }),
       });
 
@@ -101,45 +107,139 @@ export default function CompareForm() {
       </div>
 
       {showAdvanced && (
-        <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-          <p className="text-xs text-gray-500">
-            Override the automatic content detection with a CSS selector. Only
-            tag names, class selectors (.class), and ID selectors (#id) are
-            allowed.
-          </p>
-          <div>
-            <label
-              htmlFor="sourceSelector"
-              className="block text-sm font-medium text-gray-600 mb-1"
-            >
-              Source CSS selector (optional)
-            </label>
-            <input
-              id="sourceSelector"
-              type="text"
-              placeholder="#content"
-              value={sourceSelector}
-              onChange={(e) => setSourceSelector(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
-              disabled={isLoading}
-            />
+        <div className="space-y-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="space-y-4">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+              CSS Selectors
+            </p>
+            <p className="text-xs text-gray-500">
+              Override the automatic content detection with a CSS selector. Only
+              tag names, class selectors (.class), and ID selectors (#id) are
+              allowed.
+            </p>
+            <div>
+              <label
+                htmlFor="sourceSelector"
+                className="block text-sm font-medium text-gray-600 mb-1"
+              >
+                Source CSS selector (optional)
+              </label>
+              <input
+                id="sourceSelector"
+                type="text"
+                placeholder="#content"
+                value={sourceSelector}
+                onChange={(e) => setSourceSelector(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="targetSelector"
+                className="block text-sm font-medium text-gray-600 mb-1"
+              >
+                Target CSS selector (optional)
+              </label>
+              <input
+                id="targetSelector"
+                type="text"
+                placeholder=".article-body"
+                value={targetSelector}
+                onChange={(e) => setTargetSelector(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                disabled={isLoading}
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="targetSelector"
-              className="block text-sm font-medium text-gray-600 mb-1"
-            >
-              Target CSS selector (optional)
-            </label>
-            <input
-              id="targetSelector"
-              type="text"
-              placeholder=".article-body"
-              value={targetSelector}
-              onChange={(e) => setTargetSelector(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
-              disabled={isLoading}
-            />
+
+          <hr className="border-gray-200" />
+
+          <div className="space-y-4">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+              Authentication (HTTP Basic)
+            </p>
+            <p className="text-xs text-gray-500">
+              If either site requires HTTP Basic Auth (e.g. staging password
+              protection), enter credentials below. They are sent server-side
+              only and never stored.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="sourceUsername"
+                  className="block text-sm font-medium text-gray-600 mb-1"
+                >
+                  Source username
+                </label>
+                <input
+                  id="sourceUsername"
+                  type="text"
+                  placeholder="username"
+                  value={sourceUsername}
+                  onChange={(e) => setSourceUsername(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="sourcePassword"
+                  className="block text-sm font-medium text-gray-600 mb-1"
+                >
+                  Source password
+                </label>
+                <input
+                  id="sourcePassword"
+                  type="password"
+                  placeholder="password"
+                  value={sourcePassword}
+                  onChange={(e) => setSourcePassword(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="targetUsername"
+                  className="block text-sm font-medium text-gray-600 mb-1"
+                >
+                  Target username
+                </label>
+                <input
+                  id="targetUsername"
+                  type="text"
+                  placeholder="username"
+                  value={targetUsername}
+                  onChange={(e) => setTargetUsername(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  disabled={isLoading}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="targetPassword"
+                  className="block text-sm font-medium text-gray-600 mb-1"
+                >
+                  Target password
+                </label>
+                <input
+                  id="targetPassword"
+                  type="password"
+                  placeholder="password"
+                  value={targetPassword}
+                  onChange={(e) => setTargetPassword(e.target.value)}
+                  autoComplete="off"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}

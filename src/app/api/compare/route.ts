@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchPage } from '@/lib/fetcher';
-import { extractContent } from '@/lib/extractor';
-import { computeDiff } from '@/lib/differ';
-import { checkImages } from '@/lib/image-checker';
 import { checkRateLimit, releaseRequest } from '@/lib/rate-limiter';
 import { validateSelector } from '@/lib/url-validator';
-import type { ComparisonRequest, ComparisonResult } from '@/lib/types';
+import { runComparison, ComparisonError } from '@/lib/comparison-pipeline';
+import type { ComparisonRequest } from '@/lib/types';
 
 const MAX_BODY_SIZE = 100 * 1024; // 100 KB
 
@@ -18,14 +15,23 @@ function getClientIp(request: NextRequest): string {
 }
 
 function validateOrigin(request: NextRequest): boolean {
-  const allowedOrigin =
-    process.env.ALLOWED_ORIGIN || 'http://localhost:3000';
   const origin = request.headers.get('origin');
 
   // Allow requests with no Origin header (same-origin, curl, server-to-server)
   if (!origin) return true;
 
-  return origin === allowedOrigin;
+  // If an explicit allowed origin is configured, enforce it
+  if (process.env.ALLOWED_ORIGIN) {
+    return origin === process.env.ALLOWED_ORIGIN;
+  }
+
+  // In development, allow any localhost origin (port may vary)
+  try {
+    const url = new URL(origin);
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
 }
 
 function isValidHttpUrl(str: string): boolean {
@@ -88,7 +94,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    const { sourceUrl, targetUrl, sourceSelector, targetSelector } = body;
+    const { sourceUrl, targetUrl, sourceSelector, targetSelector, sourceAuth, targetAuth } = body;
 
     if (!sourceUrl || !targetUrl) {
       return NextResponse.json(
@@ -134,91 +140,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch both pages in parallel
-    let sourceHtml: string;
-    let targetHtml: string;
-    try {
-      [sourceHtml, targetHtml] = await Promise.all([
-        fetchPage(sourceUrl),
-        fetchPage(targetUrl),
-      ]);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to fetch pages';
-
-      // Differentiate URL validation errors (422) from fetch errors (502)
-      if (
-        message.includes('Blocked') ||
-        message.includes('Blocked scheme') ||
-        message.includes('private/reserved IP')
-      ) {
-        return NextResponse.json(
-          { error: message, code: 'URL_VALIDATION_FAILED' },
-          { status: 422 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: message, code: 'FETCH_FAILED' },
-        { status: 502 }
-      );
-    }
-
-    // Extract content from both pages
-    const sourceExtraction = extractContent(
-      sourceHtml,
+    // Run the comparison pipeline
+    const result = await runComparison({
       sourceUrl,
-      sourceSelector
-    );
-    const targetExtraction = extractContent(
-      targetHtml,
       targetUrl,
-      targetSelector
-    );
-
-    // Compute text diff
-    const textDiff = computeDiff(
-      sourceExtraction.text,
-      targetExtraction.text
-    );
-
-    // Check images
-    const imageReport = await checkImages(
-      sourceExtraction.images,
-      targetExtraction.images
-    );
-
-    // Calculate overall score
-    const textSimilarity = textDiff.similarity;
-    const imagePresenceScore =
-      imageReport.total === 0
-        ? 100
-        : (imageReport.found / imageReport.total) * 100;
-    const overallScore =
-      Math.round((textSimilarity * 0.7 + imagePresenceScore * 0.3) * 10) / 10;
-
-    const result: ComparisonResult = {
-      source: {
-        url: sourceUrl,
-        title: sourceExtraction.title,
-        extractedText: sourceExtraction.text,
-        textLength: sourceExtraction.text.split(/\s+/).filter(Boolean).length,
-        imageCount: sourceExtraction.images.length,
-      },
-      target: {
-        url: targetUrl,
-        title: targetExtraction.title,
-        extractedText: targetExtraction.text,
-        textLength: targetExtraction.text.split(/\s+/).filter(Boolean).length,
-        imageCount: targetExtraction.images.length,
-      },
-      textDiff,
-      images: imageReport,
-      overallScore,
-    };
+      sourceSelector,
+      targetSelector,
+      sourceAuth,
+      targetAuth,
+    });
 
     return NextResponse.json(result);
   } catch (err) {
+    if (err instanceof ComparisonError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code },
+        { status: err.httpStatus }
+      );
+    }
+
     const message =
       err instanceof Error ? err.message : 'Internal server error';
     console.error('Comparison error:', err);
