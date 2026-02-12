@@ -20,7 +20,7 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="py-8">
+    <div className="py-4">
       <ResultsView
         result={result}
         onCompareAnother={() => router.push('/')}

@@ -11,6 +11,8 @@ interface HeaderData {
     createdAt: string;
     expiresAt: string;
   };
+  syncEnabled?: boolean;
+  onToggleSync?: () => void;
 }
 
 interface HeaderContextType {

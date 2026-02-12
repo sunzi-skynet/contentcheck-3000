@@ -21,7 +21,7 @@ export default async function SharedResultPage({ params }: Props) {
   }
 
   return (
-    <div className="py-8">
+    <div className="py-4">
       <ResultsView
         result={stored.result}
         compareAnotherHref="/"
