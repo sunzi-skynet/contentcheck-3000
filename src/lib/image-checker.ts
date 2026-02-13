@@ -196,11 +196,46 @@ export async function checkImages(
     }
 
     if (!matched) {
+      // Layer 4: Substring match on normalized filenames
+      // Catches renames where one CMS adds a prefix, e.g.
+      // "brexit-rechnungswesen.jpg" matches "blog_infografiken_brexit-rechnungswesen.jpg"
+      const fname = getFilename(src.src).toLowerCase();
+      const normFname = normalizeFilename(fname);
+      const normBase = normFname.replace(/\.[a-z0-9]+$/i, '');
+      if (normBase.length >= 4) {
+        for (const tgtIdx of unmatchedTargetIndices) {
+          const tgtFname = getFilename(targetImages[tgtIdx].src).toLowerCase();
+          const tgtNorm = normalizeFilename(tgtFname);
+          const tgtBase = tgtNorm.replace(/\.[a-z0-9]+$/i, '');
+          const tgtExt = tgtNorm.slice(tgtBase.length);
+          const srcExt = normFname.slice(normBase.length);
+          // Extensions must match, and the shorter base must be contained in the longer
+          if (srcExt === tgtExt && tgtBase.length >= 4) {
+            const shorter = normBase.length <= tgtBase.length ? normBase : tgtBase;
+            const longer = normBase.length <= tgtBase.length ? tgtBase : normBase;
+            if (longer.includes(shorter)) {
+              details.push({
+                src: src.src,
+                alt: src.alt,
+                status: 'found',
+                matchMethod: 'substring-filename',
+                targetMatch: targetImages[tgtIdx].src,
+              });
+              removeFromArray(unmatchedTargetIndices, tgtIdx);
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!matched) {
       unmatchedSourceIndices.push(i);
     }
   }
 
-  // Layer 4: Content hash matching (batch)
+  // Layer 5: Content hash matching (batch)
   if (unmatchedSourceIndices.length > 0 && unmatchedTargetIndices.length > 0) {
     // Fetch hashes for all unmatched source and target images in parallel
     const sourceHashPromises = unmatchedSourceIndices.map(async (i) => ({
@@ -246,8 +281,8 @@ export async function checkImages(
     }
   }
 
-  // Layer 5: Alt text match for remaining unmatched
-  const stillUnmatched: number[] = [];
+  // Layer 6a: Exact alt text match for remaining unmatched
+  const afterExactAlt: number[] = [];
   for (const srcIdx of unmatchedSourceIndices) {
     const src = capped[srcIdx];
     if (src.alt) {
@@ -264,7 +299,42 @@ export async function checkImages(
         continue;
       }
     }
-    stillUnmatched.push(srcIdx);
+    afterExactAlt.push(srcIdx);
+  }
+
+  // Layer 6b: Fuzzy alt text match — token overlap (case-insensitive)
+  const stillUnmatched: number[] = [];
+  for (const srcIdx of afterExactAlt) {
+    const src = capped[srcIdx];
+    const srcTokens = tokenizeAlt(src.alt);
+    if (srcTokens.size < 2) {
+      stillUnmatched.push(srcIdx);
+      continue;
+    }
+    let bestIdx = -1;
+    let bestScore = 0;
+    for (const tgtIdx of unmatchedTargetIndices) {
+      const tgtTokens = tokenizeAlt(targetImages[tgtIdx].alt);
+      if (tgtTokens.size < 2) continue;
+      const overlap = countOverlap(srcTokens, tgtTokens);
+      const score = overlap / Math.max(srcTokens.size, tgtTokens.size);
+      if (score > bestScore && score >= 0.5) {
+        bestScore = score;
+        bestIdx = tgtIdx;
+      }
+    }
+    if (bestIdx !== -1) {
+      details.push({
+        src: src.src,
+        alt: src.alt,
+        status: 'found',
+        matchMethod: 'fuzzy-alt-text',
+        targetMatch: targetImages[bestIdx].src,
+      });
+      removeFromArray(unmatchedTargetIndices, bestIdx);
+    } else {
+      stillUnmatched.push(srcIdx);
+    }
   }
 
   // Mark remaining as missing
@@ -289,4 +359,24 @@ export async function checkImages(
 function removeFromArray(arr: number[], value: number): void {
   const idx = arr.indexOf(value);
   if (idx !== -1) arr.splice(idx, 1);
+}
+
+function tokenizeAlt(alt: string): Set<string> {
+  if (!alt) return new Set();
+  return new Set(
+    alt
+      .toLowerCase()
+      .replace(/[^a-z0-9äöüß]+/gi, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length >= 2)
+  );
+}
+
+function countOverlap(a: Set<string>, b: Set<string>): number {
+  let count = 0;
+  for (const token of Array.from(a)) {
+    if (b.has(token)) count++;
+  }
+  return count;
 }

@@ -25,7 +25,7 @@ export interface ImageDetail {
   src: string;
   alt: string;
   status: 'found' | 'missing' | 'unverified';
-  matchMethod?: 'exact-url' | 'filename' | 'normalized-filename' | 'content-hash' | 'alt-text';
+  matchMethod?: 'exact-url' | 'filename' | 'normalized-filename' | 'substring-filename' | 'content-hash' | 'alt-text' | 'fuzzy-alt-text';
   targetMatch?: string;
 }
 
