@@ -33,7 +33,10 @@ export class FileSystemResultStore {
   private lastCleanup = 0;
 
   constructor(baseDir?: string, ttlHours?: number) {
-    this.baseDir = baseDir ?? path.join(process.cwd(), 'data', 'results');
+    this.baseDir = baseDir ?? path.join(
+      process.env.VERCEL ? '/tmp' : process.cwd(),
+      'data', 'results'
+    );
     this.ttlHours = ttlHours ?? (parseInt(process.env.RESULT_TTL_HOURS || '', 10) || DEFAULT_TTL_HOURS);
   }
 

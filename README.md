@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ContentCheck 3000
 
-## Getting Started
+Compare source and target pages during website migrations to verify that text and images were migrated correctly.
 
-First, run the development server:
+**Live:** [contentcheck-3000.vercel.app](https://contentcheck-3000.vercel.app)
+
+## What it does
+
+During CMS-to-CMS migrations, the content (text and images) must survive even though the design, navigation, and layout change. ContentCheck 3000 extracts the main content from both pages and produces:
+
+- **Text diff** with word-level highlighting and similarity score
+- **Image presence report** — which source images were found on the target (matched by URL, filename, content hash, or alt text)
+- **Visual preview** — side-by-side annotated HTML previews with sync scroll, showing migrated vs. missing content
+- **Overall migration score** (weighted: 70% text, 30% images)
+
+## Quick start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000), enter a source URL and target URL, and hit Compare.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All processing runs server-side. No content is stored permanently.
 
-## Learn More
+```
+User submits URLs → POST /api/compare
+  → url-validator    (validate scheme, resolve DNS, block private IPs — SSRF protection)
+  → fetcher          (fetch HTML, streaming body with 5 MB cap, encoding detection)
+  → extractor        (cheerio → extract main content text + images)
+  → differ           (word-level text diff + similarity %)
+  → image-checker    (layered matching: URL → filename → content hash → alt text)
+  → annotator        (HTML annotation for visual preview with highlight classes)
+  → response
+```
 
-To learn more about Next.js, take a look at the following resources:
+### Content extraction strategy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The extractor auto-detects the main content area using a priority-based fallback:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. `<main>` → `<article>` → `[role="main"]`
+2. Common CMS containers (`#content`, `.entry-content`, `.post-content`, `.page-content`)
+3. `<body>` minus nav, header, footer, sidebar, ads, etc.
 
-## Deploy on Vercel
+Users can override this with custom CSS selectors or include/exclude selector lists.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Headless API
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For CI/CD pipelines or automated checks, there's a headless API at `POST /api/v1/compare` with API key authentication.
+
+```bash
+curl -X POST https://contentcheck-3000.vercel.app/api/v1/compare \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"sourceUrl": "https://old-site.com/page", "targetUrl": "https://new-site.com/page"}'
+```
+
+Returns a lean JSON response with scores, missed content, and a shareable result URL.
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_BASE_URL` | Yes (production) | Base URL for shareable result links |
+| `ALLOWED_ORIGIN` | No | CORS origin restriction. If unset, accepts localhost in dev and same-origin requests in production |
+| `API_KEYS` | No | Comma-separated `name:key` pairs for headless API auth (e.g. `myapp:sk-abc123`) |
+| `RESULT_TTL_HOURS` | No | Result expiry in hours (default: 168 = 7 days) |
+
+## Tech stack
+
+- [Next.js 14](https://nextjs.org/) (App Router) — fullstack framework
+- [TypeScript](https://www.typescriptlang.org/) (strict mode)
+- [Tailwind CSS](https://tailwindcss.com/) — styling
+- [cheerio](https://cheerio.js.org/) — server-side HTML parsing
+- [diff](https://www.npmjs.com/package/diff) — word-level text diffing
+- [Vitest](https://vitest.dev/) — testing
+
+## Scripts
+
+```bash
+npm run dev       # Dev server (localhost:3000)
+npm run build     # Production build
+npm run start     # Production server
+npm run lint      # ESLint
+npx vitest run    # Run tests
+```
+
+## Security
+
+The app fetches arbitrary user-provided URLs server-side, so SSRF protection is a core concern:
+
+- DNS resolution with private/reserved IP blocking before every fetch
+- Streaming body reads with 5 MB cap (never `response.text()` directly)
+- Manual redirect handling with re-validation per hop (max 3)
+- Per-IP and global rate limiting
+- CSS selector validation against a safe-pattern allowlist
+- CORS origin validation
+
+## Known limitations
+
+- **No JS rendering** — client-side rendered SPAs will show minimal content
+- **Heuristic extraction** — sites without semantic HTML may include non-content elements
+- **No perceptual image matching** — resized/recompressed images won't match (content hash only)
+- **Single page pairs** — no batch/sitemap comparison yet
+- **Ephemeral storage** — on serverless platforms (Vercel), shareable result links are not persistent
+
+## License
+
+Private — not open source.
