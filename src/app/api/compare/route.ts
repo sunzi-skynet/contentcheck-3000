@@ -20,6 +20,15 @@ function validateOrigin(request: NextRequest): boolean {
   // Allow requests with no Origin header (same-origin, curl, server-to-server)
   if (!origin) return true;
 
+  // Always allow same-origin requests (origin matches the request's own host)
+  try {
+    const originHost = new URL(origin).host;
+    const requestHost = request.headers.get('host');
+    if (requestHost && originHost === requestHost) return true;
+  } catch {
+    // fall through to other checks
+  }
+
   // If an explicit allowed origin is configured, enforce it
   if (process.env.ALLOWED_ORIGIN) {
     return origin === process.env.ALLOWED_ORIGIN;
