@@ -1,10 +1,10 @@
-# Migration Checker - MVP Plan
+# ContentCheck 3000 - MVP Plan
 
 ## Context
 
 During website migration projects (e.g. CMS to CMS), content (text and images) must be preserved even though the UI, navigation, and layout will change. There's currently no easy tool to verify that migration was successful at the content level.
 
-**Migration Checker** is a web app that lets users compare a source page and a target page, extracts the main content area from each, and shows a clear diff of what text changed and which images are present or missing.
+**ContentCheck 3000** is a web app that lets users compare a source page and a target page, extracts the main content area from each, and shows a clear diff of what text changed and which images are present or missing.
 
 **MVP goal**: A working web app where a user can enter two URLs, see a text diff and image presence report, and judge migration completeness.
 
@@ -41,7 +41,7 @@ No existing tool fills this exact niche. Adjacent tools fall short for CMS-to-CM
 ## Architecture
 
 ```
-migration-checker/
+contentcheck-3000/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx                # Root layout with nav
@@ -143,7 +143,7 @@ The app is effectively an open proxy. Without controls, attackers can use it to 
 The `POST /api/compare` endpoint must not be callable from arbitrary third-party origins. Without protection, an attacker could embed a form or script on their site that submits to the API, using visitors as unwitting proxies.
 
 **Required mitigations:**
-1. **Origin header validation**: Reject requests where the `Origin` header doesn't match the app's own origin. The allowed origin is configured via the `ALLOWED_ORIGIN` environment variable (e.g. `https://migration-checker.vercel.app`). In development, default to `http://localhost:3000`. Return `403 Forbidden` for mismatches.
+1. **Origin header validation**: Reject requests where the `Origin` header doesn't match the app's own origin. The allowed origin is configured via the `ALLOWED_ORIGIN` environment variable (e.g. `https://contentcheck-3000.vercel.app`). In development, default to `http://localhost:3000`. Return `403 Forbidden` for mismatches.
 2. **`SameSite` cookies** (if cookies are used later): Ensure cookies are `SameSite=Strict` or `SameSite=Lax`.
 3. **No CORS wildcard**: Do not set `Access-Control-Allow-Origin: *`. Only allow the app's own origin.
 

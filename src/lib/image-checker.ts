@@ -63,7 +63,7 @@ async function fetchImageHash(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'User-Agent': 'MigrationChecker/1.0' },
+      headers: { 'User-Agent': 'ContentCheck3000/1.0' },
       signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
       redirect: 'follow',
     });

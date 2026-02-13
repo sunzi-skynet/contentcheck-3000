@@ -4,7 +4,7 @@ import type { AuthCredentials } from './types';
 const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5 MB
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_REDIRECTS = 3;
-const USER_AGENT = 'MigrationChecker/1.0';
+const USER_AGENT = 'ContentCheck3000/1.0';
 
 function getTimeoutMs(): number {
   const envVal = process.env.FETCH_TIMEOUT_MS;

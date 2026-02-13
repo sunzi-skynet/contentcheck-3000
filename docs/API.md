@@ -1,8 +1,8 @@
-# Migration Checker API
+# ContentCheck 3000 API
 
 ## Overview
 
-Migration Checker provides two API endpoints for comparing source and target pages during website migrations. Both endpoints run the same comparison pipeline: fetch pages, extract content, compute text diff, check image presence, and annotate HTML for visual preview.
+ContentCheck 3000 provides two API endpoints for comparing source and target pages during website migrations. Both endpoints run the same comparison pipeline: fetch pages, extract content, compute text diff, check image presence, and annotate HTML for visual preview.
 
 - **Webapp endpoint** (`POST /api/compare`) — CORS-validated, IP rate-limited, returns full comparison result
 - **Headless endpoint** (`POST /api/v1/compare`) — API key auth, per-key rate-limited, returns lean response + shareable URL

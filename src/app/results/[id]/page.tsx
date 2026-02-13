@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props) {
   if (!stored) return { title: 'Not Found' };
 
   return {
-    title: `Migration Check: ${stored.metadata.overallScore}% — ${stored.metadata.sourceUrl}`,
+    title: `ContentCheck 3000: ${stored.metadata.overallScore}% — ${stored.metadata.sourceUrl}`,
     description: `Comparison between ${stored.metadata.sourceUrl} and ${stored.metadata.targetUrl}`,
   };
 }

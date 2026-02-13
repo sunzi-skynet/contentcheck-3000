@@ -17,7 +17,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Migration Checker',
+  title: 'ContentCheck 3000',
   description:
     'Compare source and target pages during website migrations. See text diffs and image presence reports.',
 };
@@ -39,7 +39,7 @@ export default function RootLayout({
               <main className="flex-1 flex flex-col">{children}</main>
               <footer className="border-t border-white/10 bg-black">
                 <div className="max-w-5xl mx-auto px-4 py-4 text-center text-xs text-white/30">
-                  Migration Checker &mdash; Compare pages during website migrations
+                  ContentCheck 3000 &mdash; Compare pages during website migrations
                 </div>
               </footer>
             </div>

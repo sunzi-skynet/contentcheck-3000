@@ -109,6 +109,52 @@ describe('extractContent', () => {
     expect(() => extractContent(html, BASE_URL, '.nonexistent')).toThrow('matched no elements');
   });
 
+  it('extracts lazy-loaded images via data-lazy-src', () => {
+    const html = `
+      <html><body><main>
+        <img src="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20993%20512'%3E%3C/svg%3E"
+             data-lazy-src="https://example.com/wp-content/uploads/image.jpg"
+             alt="Lazy image">
+      </main></body></html>`;
+    const result = extractContent(html, BASE_URL);
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].src).toBe('https://example.com/wp-content/uploads/image.jpg');
+    expect(result.images[0].alt).toBe('Lazy image');
+  });
+
+  it('extracts lazy-loaded images via data-src', () => {
+    const html = `
+      <html><body><main>
+        <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+             data-src="/images/photo.jpg"
+             alt="Generic lazy">
+      </main></body></html>`;
+    const result = extractContent(html, BASE_URL);
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].src).toBe('https://example.com/images/photo.jpg');
+  });
+
+  it('prefers real src over data-lazy-src when src is not a data URI', () => {
+    const html = `
+      <html><body><main>
+        <img src="/images/real.jpg"
+             data-lazy-src="/images/lazy.jpg"
+             alt="Real src">
+      </main></body></html>`;
+    const result = extractContent(html, BASE_URL);
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].src).toBe('https://example.com/images/real.jpg');
+  });
+
+  it('skips images with only data URI and no lazy-load fallback', () => {
+    const html = `
+      <html><body><main>
+        <img src="data:image/svg+xml,placeholder" alt="No fallback">
+      </main></body></html>`;
+    const result = extractContent(html, BASE_URL);
+    expect(result.images).toHaveLength(0);
+  });
+
   it('extracts picture source elements', () => {
     const html = `
       <html><body><main>

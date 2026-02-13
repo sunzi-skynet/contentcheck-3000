@@ -20,11 +20,10 @@ export default function Home() {
         {/* Hero */}
         <div className="text-center mb-10">
           <h1 className="text-4xl sm:text-5xl font-bold text-[#C4FF47] mb-4 tracking-tight">
-            Compare Migration Pages
+            ContentCheck 3000
           </h1>
           <p className="text-white/50 max-w-xl mx-auto text-lg mb-6">
             Enter the source and target URLs to compare their content.
-            See what text and images didn&apos;t make it to the new page.
           </p>
 
           {/* Feature highlights */}

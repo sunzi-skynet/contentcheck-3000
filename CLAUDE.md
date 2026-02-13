@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Migration Checker** is a web app that compares a source page and target page during website migrations (e.g. CMS to CMS). It extracts main content from each page and produces a text diff and image presence report so users can judge migration completeness.
+**ContentCheck 3000** is a web app that compares a source page and target page during website migrations (e.g. CMS to CMS). It extracts main content from each page and produces a text diff and image presence report so users can judge migration completeness.
 
 The project plan lives in `PLAN.md` — refer to it for the full technical spec, API contracts, security requirements, and implementation roadmap.
 

@@ -14,7 +14,7 @@ export default function AppHeader() {
           <div className="flex items-center gap-3 flex-wrap min-w-0">
             <div className="flex items-center gap-2 shrink-0">
               <a href="/" className="text-lg font-bold text-[#C4FF47] hover:text-[#d4ff6a] transition">
-                Migration Checker
+                ContentCheck 3000
               </a>
               <span className="text-xs text-white/60 border border-white/20 rounded px-1.5 py-0.5">
                 v0.1.0
