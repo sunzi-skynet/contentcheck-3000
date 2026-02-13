@@ -65,6 +65,8 @@ Returns a lean JSON response with scores, missed content, and a shareable result
 | Variable | Required | Description |
 |---|---|---|
 | `NEXT_PUBLIC_BASE_URL` | Yes (production) | Base URL for shareable result links |
+| `SUPABASE_URL` | No | Supabase project URL. If set with `SUPABASE_SERVICE_ROLE_KEY`, results are stored in Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | Supabase service role key (server-side only, never expose to client) |
 | `ALLOWED_ORIGIN` | No | CORS origin restriction. If unset, accepts localhost in dev and same-origin requests in production |
 | `API_KEYS` | No | Comma-separated `name:key` pairs for headless API auth (e.g. `myapp:sk-abc123`) |
 | `RESULT_TTL_HOURS` | No | Result expiry in hours (default: 168 = 7 days) |
@@ -105,7 +107,7 @@ The app fetches arbitrary user-provided URLs server-side, so SSRF protection is 
 - **Heuristic extraction** — sites without semantic HTML may include non-content elements
 - **No perceptual image matching** — resized/recompressed images won't match (content hash only)
 - **Single page pairs** — no batch/sitemap comparison yet
-- **Ephemeral storage** — on serverless platforms (Vercel), shareable result links are not persistent
+- **Ephemeral storage** — without Supabase configured, results use the filesystem and are not persistent on serverless platforms
 
 ## License
 
