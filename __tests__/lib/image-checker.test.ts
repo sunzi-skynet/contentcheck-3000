@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkImages } from '../../src/lib/image-checker';
+import { checkImages, stripCdnTransforms } from '../../src/lib/image-checker';
 import type { ImageInfo } from '../../src/lib/types';
 
 // Mock DNS and fetch to avoid real network calls
@@ -197,6 +197,89 @@ describe('image-checker', () => {
       ];
       const result = await checkImages(source, target);
       expect(result.details[0].matchMethod).toBe('filename');
+    });
+  });
+
+  describe('stripCdnTransforms', () => {
+    it('strips Storyblok /m/filters:quality() transform', () => {
+      expect(stripCdnTransforms(
+        'https://a.storyblok.com/f/123/image.png/m/filters:quality(80)'
+      )).toBe('https://a.storyblok.com/f/123/image.png');
+    });
+
+    it('strips Storyblok /m/WxH/filters transform', () => {
+      expect(stripCdnTransforms(
+        'https://a.storyblok.com/f/123/photo.jpg/m/100x200/filters:quality(80)'
+      )).toBe('https://a.storyblok.com/f/123/photo.jpg');
+    });
+
+    it('strips Storyblok /m/fit-in/ transform', () => {
+      expect(stripCdnTransforms(
+        'https://a.storyblok.com/f/123/banner.webp/m/fit-in/800x600'
+      )).toBe('https://a.storyblok.com/f/123/banner.webp');
+    });
+
+    it('leaves non-Storyblok URLs without query params unchanged', () => {
+      const url = 'https://example.com/uploads/photo.jpg';
+      expect(stripCdnTransforms(url)).toBe(url);
+    });
+
+    it('strips common CDN query params (Imgix-style)', () => {
+      expect(stripCdnTransforms(
+        'https://cdn.imgix.net/photo.jpg?w=800&h=600&fit=crop&q=80'
+      )).toBe('https://cdn.imgix.net/photo.jpg');
+    });
+
+    it('strips WordPress Photon query params', () => {
+      expect(stripCdnTransforms(
+        'https://i0.wp.com/example.com/photo.jpg?resize=300%2C200&quality=80'
+      )).toBe('https://i0.wp.com/example.com/photo.jpg');
+    });
+
+    it('preserves non-CDN query params', () => {
+      expect(stripCdnTransforms(
+        'https://example.com/image.jpg?token=abc123&version=2'
+      )).toBe('https://example.com/image.jpg?token=abc123&version=2');
+    });
+
+    it('strips only CDN params, keeps others', () => {
+      const result = stripCdnTransforms(
+        'https://cdn.example.com/photo.jpg?w=800&token=abc'
+      );
+      expect(result).toContain('token=abc');
+      expect(result).not.toContain('w=800');
+    });
+
+    it('handles invalid URLs gracefully', () => {
+      expect(stripCdnTransforms('not-a-url')).toBe('not-a-url');
+    });
+  });
+
+  describe('Layer 5: Content hash with CDN transform stripping', () => {
+    it('matches images with same content but different CDN URLs', async () => {
+      const imageBytes = new TextEncoder().encode('identical-image-content');
+      // Source: raw WordPress URL
+      fetchResponses.set(
+        'https://old.com/wp-content/uploads/Blog-Template-1.png',
+        imageBytes.buffer as ArrayBuffer
+      );
+      // Target: Storyblok URL — stripped version serves same bytes
+      fetchResponses.set(
+        'https://a.storyblok.com/f/123/blog-new-name.png',
+        imageBytes.buffer as ArrayBuffer
+      );
+
+      const source: ImageInfo[] = [{
+        src: 'https://old.com/wp-content/uploads/Blog-Template-1.png',
+        alt: '',
+      }];
+      const target: ImageInfo[] = [{
+        src: 'https://a.storyblok.com/f/123/blog-new-name.png/m/filters:quality(80)',
+        alt: 'Completely different alt',
+      }];
+      const result = await checkImages(source, target);
+      expect(result.found).toBe(1);
+      expect(result.details[0].matchMethod).toBe('content-hash');
     });
   });
 

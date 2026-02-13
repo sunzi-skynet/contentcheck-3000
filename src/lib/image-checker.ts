@@ -46,6 +46,54 @@ function normalizeFilename(filename: string): string {
   return (cleaned || base) + ext;
 }
 
+/**
+ * Strip CDN image transformation parameters to get the original uploaded file URL.
+ * This improves content-hash matching because CDN transforms (resize, quality, etc.)
+ * change the image bytes even when the underlying file is identical.
+ */
+export function stripCdnTransforms(url: string): string {
+  try {
+    const parsed = new URL(url);
+
+    // Storyblok: strip /m/... transform pipeline from path
+    // e.g. .../image.png/m/filters:quality(80) → .../image.png
+    if (parsed.hostname.includes('storyblok.com')) {
+      const pathMatch = parsed.pathname.match(
+        /^(.*\.(?:jpe?g|png|gif|webp|avif|svg|bmp|ico|tiff?))\/m\/.*/i
+      );
+      if (pathMatch) {
+        parsed.pathname = pathMatch[1];
+        parsed.search = '';
+        return parsed.toString();
+      }
+    }
+
+    // General: strip common image CDN query params (Imgix, WordPress Photon, etc.)
+    if (parsed.search) {
+      const cdnParams = new Set([
+        'w', 'h', 'width', 'height', 'quality', 'q',
+        'fit', 'crop', 'resize', 'format', 'auto', 'dpr',
+      ]);
+      const params = new URLSearchParams(parsed.search);
+      let changed = false;
+      for (const key of Array.from(params.keys())) {
+        if (cdnParams.has(key.toLowerCase())) {
+          params.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) {
+        parsed.search = params.toString();
+        return parsed.toString();
+      }
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 async function isUrlSafe(url: string): Promise<boolean> {
   try {
     const parsed = new URL(url);
@@ -236,15 +284,26 @@ export async function checkImages(
   }
 
   // Layer 5: Content hash matching (batch)
+  // Use stripped CDN URLs to compare original file bytes (transforms change hashes)
   if (unmatchedSourceIndices.length > 0 && unmatchedTargetIndices.length > 0) {
     // Fetch hashes for all unmatched source and target images in parallel
+    // Try stripped URL first (original file), fall back to transformed URL
+    const fetchHashWithFallback = async (url: string): Promise<string | null> => {
+      const cleanUrl = stripCdnTransforms(url);
+      if (cleanUrl !== url) {
+        const hash = await fetchImageHash(cleanUrl);
+        if (hash) return hash;
+      }
+      return fetchImageHash(url);
+    };
+
     const sourceHashPromises = unmatchedSourceIndices.map(async (i) => ({
       index: i,
-      hash: await fetchImageHash(capped[i].src),
+      hash: await fetchHashWithFallback(capped[i].src),
     }));
     const targetHashPromises = unmatchedTargetIndices.map(async (i) => ({
       index: i,
-      hash: await fetchImageHash(targetImages[i].src),
+      hash: await fetchHashWithFallback(targetImages[i].src),
     }));
 
     const [sourceHashes, targetHashes] = await Promise.all([
